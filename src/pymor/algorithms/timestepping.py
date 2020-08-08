@@ -154,8 +154,8 @@ def implicit_euler(A, F, M, U0, t0, t1, nt, mu=None, num_values=None, solver_opt
     R.append(U0)
 
     options = A.solver_options if solver_options == 'operator' else \
-              M.solver_options if solver_options == 'mass' else \
-              solver_options
+        M.solver_options if solver_options == 'mass' else \
+        solver_options
     M_dt_A = (M + A * dt).with_(solver_options=options)
     if not M_dt_A.parametric or 't' not in M_dt_A.parameters:
         M_dt_A = M_dt_A.assemble(mu)
