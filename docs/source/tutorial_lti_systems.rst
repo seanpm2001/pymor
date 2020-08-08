@@ -109,6 +109,43 @@ which gives the dimensions of the underlying system more directly,
 together with some of its properties.
 
 
+Time domain analysis
+--------------------
+
+Impulse response
+
+.. jupyter-execute::
+
+    T = 4
+    nt = 100
+    fom = fom.with_(T=T, time_stepper=ImplicitEulerTimeStepper(nt))
+    ts = np.linspace(0, T, nt + 1)
+    _, ys = fom.imp_resp(return_output=True)
+    fig, axs = plt.subplots(3, 2, figsize=(10, 12), constrained_layout=True)
+    for (i, j), ax in np.ndenumerate(axs):
+        ax.plot(ts, ys[j].to_numpy()[:, i])
+        ax.grid()
+
+Step response
+
+.. jupyter-execute::
+
+    _, ys = fom.step_resp(return_output=True)
+    fig, axs = plt.subplots(3, 2, figsize=(10, 12), constrained_layout=True)
+    for (i, j), ax in np.ndenumerate(axs):
+        ax.plot(ts, ys[j].to_numpy()[:, i])
+        ax.grid()
+
+A sinusoidal input response
+
+.. jupyter-execute::
+
+    _, ys = fom.solve(return_output=True, inputs=['0', 'sin(5 * t)'])
+    fig, ax = plt.subplots()
+    ax.plot(ts, ys.to_numpy())
+    ax.grid()
+
+
 Transfer function evaluation
 ----------------------------
 

@@ -15,6 +15,7 @@ First, we import necessary packages, including
     import matplotlib.pyplot as plt
     import numpy as np
     import scipy.sparse as sps
+    from pymor.algorithms.timestepping import ImplicitEulerTimeStepper
     from pymor.models.iosys import LTIModel
     from pymor.reductors.bt import BTReductor
 
