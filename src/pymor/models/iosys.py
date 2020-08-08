@@ -580,7 +580,8 @@ class LTIModel(InputStateOutputModel):
             E = IdentityOperator(BlockVectorSpace([self.solution_space, other.solution_space]))
         else:
             E = BlockDiagonalOperator([self.E, other.E])
-        return self.with_(A=A, B=B, C=C, D=D, E=E)
+        initial_data = BlockVectorSpace.make_array([self.initial_data, other.initial_data])
+        return self.with_(A=A, B=B, C=C, D=D, E=E, initial_data=initial_data)
 
     def __sub__(self, other):
         """Subtract an |LTIModel|."""
@@ -604,7 +605,8 @@ class LTIModel(InputStateOutputModel):
         C = BlockRowOperator([self.C, self.D @ other.C])
         D = self.D @ other.D
         E = BlockDiagonalOperator([self.E, other.E])
-        return self.with_(A=A, B=B, C=C, D=D, E=E)
+        initial_data = BlockColumnOperator([self.initial_data, other.initial_data])
+        return self.with_(A=A, B=B, C=C, D=D, E=E, initial_data=initial_data)
 
     def _solve(self, mu=None, return_output=False, inputs=None):
         assert inputs is not None, 'the inputs need to be specified'
