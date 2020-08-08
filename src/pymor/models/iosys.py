@@ -12,12 +12,15 @@ from pymor.core.cache import cached
 from pymor.core.config import config
 from pymor.core.defaults import defaults
 from pymor.models.interface import Model
+from pymor.models.basic import InstationaryModel
 from pymor.operators.block import (BlockOperator, BlockRowOperator, BlockColumnOperator, BlockDiagonalOperator,
                                    SecondOrderModelOperator)
-from pymor.operators.constructions import IdentityOperator, LincombOperator, ZeroOperator
+from pymor.operators.constructions import IdentityOperator, LincombOperator, VectorOperator, ZeroOperator
 from pymor.operators.numpy import NumpyMatrixOperator
-from pymor.parameters.base import Mu
+from pymor.parameters.base import Mu, Parameters
+from pymor.parameters.functionals import ExpressionParameterFunctional
 from pymor.vectorarrays.block import BlockVectorSpace
+from pymor.vectorarrays.interface import VectorArray
 
 
 @defaults('value')
@@ -251,8 +254,23 @@ class LTIModel(InputStateOutputModel):
         The |Operator| D or `None` (then D is assumed to be zero).
     E
         The |Operator| E or `None` (then E is assumed to be identity).
+    initial_data
+        The initial data `x_0`. If `None`, it is assumed to be zero.
+        Otherwise, either a |VectorArray| of length 1 or (for the
+        |Parameter|-dependent case) a vector-like |Operator| (i.e. a
+        linear |Operator| with `source.dim == 1`) which applied to
+        `NumpyVectorArray(np.array([1]))` will yield the initial data
+        for given |parameter values|.
     cont_time
         `True` if the system is continuous-time, otherwise `False`.
+    T
+        The final time T.
+    time_stepper
+        The :class:`time-stepper <pymor.algorithms.timestepping.TimeStepper>`
+        to be used by :meth:`~pymor.models.interface.Model.solve`.
+    num_values
+        The number of returned vectors of the solution trajectory. If `None`, each
+        intermediate vector that is calculated is returned.
     solver_options
         The solver options to use to solve the Lyapunov equations.
     error_estimator
@@ -286,9 +304,12 @@ class LTIModel(InputStateOutputModel):
         The |Operator| D.
     E
         The |Operator| E.
+    initial_data
+        Initial data as an |Operator|.
     """
 
-    def __init__(self, A, B, C, D=None, E=None, cont_time=True,
+    def __init__(self, A, B, C, D=None, E=None, initial_data=None, cont_time=True,
+                 T=None, time_stepper=None, num_values=None,
                  solver_options=None, error_estimator=None, visualizer=None, name=None):
 
         assert A.linear
@@ -307,6 +328,15 @@ class LTIModel(InputStateOutputModel):
         assert E.linear
         assert E.source == E.range
         assert E.source == A.source
+
+        if initial_data is None:
+            initial_data = A.source.zeros(1)
+        if isinstance(initial_data, VectorArray):
+            assert initial_data in A.source
+            assert len(initial_data) == 1
+            initial_data = VectorOperator(initial_data, name='initial_data')
+        assert initial_data.source.is_scalar
+        assert initial_data.range == A.source
 
         assert solver_options is None or solver_options.keys() <= {'lyap_lrcf', 'lyap_dense'}
 
@@ -575,6 +605,34 @@ class LTIModel(InputStateOutputModel):
         D = self.D @ other.D
         E = BlockDiagonalOperator([self.E, other.E])
         return self.with_(A=A, B=B, C=C, D=D, E=E)
+
+    def _solve(self, mu=None, return_output=False, inputs=None):
+        assert inputs is not None, 'the inputs need to be specified'
+        assert self.T is not None, 'the final time needs to be set'
+        assert self.time_stepper is not None, 'the time stepper needs to be set'
+
+        T = self.T
+        initial_data = self.initial_data
+        operator = -self.A
+        inputs = [ExpressionParameterFunctional(f, Parameters({'t': 1})) for f in inputs]
+        Bs = []
+        for i in range(self.input_dim):
+            e_i = np.zeros(self.input_dim)
+            e_i[i] = 1
+            e_i = self.B.source.from_numpy(e_i)
+            Bs.append(VectorOperator(self.B.apply(e_i, mu=mu)))
+        rhs = LincombOperator(Bs, inputs)
+        mass = self.E
+        time_stepper = self.time_stepper
+        num_values = self.num_values
+
+        instationary_model = InstationaryModel(T, initial_data, operator, rhs, mass=mass,
+                                               time_stepper=time_stepper, num_values=num_values)
+
+        X = instationary_model.solve(mu=mu)
+        if return_output:
+            return X, self.C.apply(X, mu=mu)
+        return X
 
     @cached
     def poles(self, mu=None):
