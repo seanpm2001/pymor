@@ -357,7 +357,8 @@ class LTIModel(InputStateOutputModel):
         )
 
     @classmethod
-    def from_matrices(cls, A, B, C, D=None, E=None, cont_time=True,
+    def from_matrices(cls, A, B, C, D=None, E=None, initial_data=None, cont_time=True,
+                      T=None, time_stepper=None, num_values=None,
                       state_id='STATE', solver_options=None, error_estimator=None,
                       visualizer=None, name=None):
         """Create |LTIModel| from matrices.
@@ -374,8 +375,19 @@ class LTIModel(InputStateOutputModel):
             The |NumPy array| or |SciPy spmatrix| D or `None` (then D is assumed to be zero).
         E
             The |NumPy array| or |SciPy spmatrix| E or `None` (then E is assumed to be identity).
+        initial_data
+            The initial data `x_0` as a |NumPy array| or |SciPy spmatrix| or `None` (then assumed to
+            be zero).
         cont_time
             `True` if the system is continuous-time, otherwise `False`.
+        T
+            The final time T.
+        time_stepper
+            The :class:`time-stepper <pymor.algorithms.timestepping.TimeStepper>`
+            to be used by :meth:`~pymor.models.interface.Model.solve`.
+        num_values
+            The number of returned vectors of the solution trajectory. If `None`, each
+            intermediate vector that is calculated is returned.
         state_id
             Id of the state space.
         solver_options
@@ -402,6 +414,7 @@ class LTIModel(InputStateOutputModel):
         assert isinstance(C, (np.ndarray, sps.spmatrix))
         assert D is None or isinstance(D, (np.ndarray, sps.spmatrix))
         assert E is None or isinstance(E, (np.ndarray, sps.spmatrix))
+        assert initial_data is None or isinstance(initial_data, (np.ndarray, sps.spmatrix))
 
         A = NumpyMatrixOperator(A, source_id=state_id, range_id=state_id)
         B = NumpyMatrixOperator(B, range_id=state_id)
@@ -410,13 +423,17 @@ class LTIModel(InputStateOutputModel):
             D = NumpyMatrixOperator(D)
         if E is not None:
             E = NumpyMatrixOperator(E, source_id=state_id, range_id=state_id)
+        if initial_data is not None:
+            initial_data = A.source.from_numpy(initial_data)
 
-        return cls(A, B, C, D, E, cont_time=cont_time,
+        return cls(A, B, C, D, E, initial_data=initial_data, cont_time=cont_time,
+                   T=None, time_stepper=None, num_values=None,
                    solver_options=solver_options, error_estimator=error_estimator, visualizer=visualizer,
                    name=name)
 
     @classmethod
     def from_files(cls, A_file, B_file, C_file, D_file=None, E_file=None, cont_time=True,
+                   T=None, time_stepper=None, num_values=None,
                    state_id='STATE', solver_options=None, error_estimator=None, visualizer=None,
                    name=None):
         """Create |LTIModel| from matrices stored in separate files.
@@ -435,6 +452,14 @@ class LTIModel(InputStateOutputModel):
             `None` or the name of the file (with extension) containing E.
         cont_time
             `True` if the system is continuous-time, otherwise `False`.
+        T
+            The final time T.
+        time_stepper
+            The :class:`time-stepper <pymor.algorithms.timestepping.TimeStepper>`
+            to be used by :meth:`~pymor.models.interface.Model.solve`.
+        num_values
+            The number of returned vectors of the solution trajectory. If `None`, each
+            intermediate vector that is calculated is returned.
         state_id
             Id of the state space.
         solver_options
@@ -465,11 +490,13 @@ class LTIModel(InputStateOutputModel):
         E = load_matrix(E_file) if E_file is not None else None
 
         return cls.from_matrices(A, B, C, D, E, cont_time=cont_time,
+                                 T=None, time_stepper=None, num_values=None,
                                  state_id=state_id, solver_options=solver_options,
                                  error_estimator=error_estimator, visualizer=visualizer, name=name)
 
     @classmethod
     def from_mat_file(cls, file_name, cont_time=True,
+                      T=None, time_stepper=None, num_values=None,
                       state_id='STATE', solver_options=None, error_estimator=None,
                       visualizer=None, name=None):
         """Create |LTIModel| from matrices stored in a .mat file.
@@ -481,6 +508,14 @@ class LTIModel(InputStateOutputModel):
             C, and optionally D and E.
         cont_time
             `True` if the system is continuous-time, otherwise `False`.
+        T
+            The final time T.
+        time_stepper
+            The :class:`time-stepper <pymor.algorithms.timestepping.TimeStepper>`
+            to be used by :meth:`~pymor.models.interface.Model.solve`.
+        num_values
+            The number of returned vectors of the solution trajectory. If `None`, each
+            intermediate vector that is calculated is returned.
         state_id
             Id of the state space.
         solver_options
@@ -514,11 +549,13 @@ class LTIModel(InputStateOutputModel):
         E = mat_dict['E'] if 'E' in mat_dict else None
 
         return cls.from_matrices(A, B, C, D, E, cont_time=cont_time,
+                                 T=None, time_stepper=None, num_values=None,
                                  state_id=state_id, solver_options=solver_options,
                                  error_estimator=error_estimator, visualizer=visualizer, name=name)
 
     @classmethod
     def from_abcde_files(cls, files_basename, cont_time=True,
+                         T=None, time_stepper=None, num_values=None,
                          state_id='STATE', solver_options=None, error_estimator=None,
                          visualizer=None, name=None):
         """Create |LTIModel| from matrices stored in a .[ABCDE] files.
@@ -529,6 +566,14 @@ class LTIModel(InputStateOutputModel):
             The basename of files containing A, B, C, and optionally D and E.
         cont_time
             `True` if the system is continuous-time, otherwise `False`.
+        T
+            The final time T.
+        time_stepper
+            The :class:`time-stepper <pymor.algorithms.timestepping.TimeStepper>`
+            to be used by :meth:`~pymor.models.interface.Model.solve`.
+        num_values
+            The number of returned vectors of the solution trajectory. If `None`, each
+            intermediate vector that is calculated is returned.
         state_id
             Id of the state space.
         solver_options
@@ -560,6 +605,7 @@ class LTIModel(InputStateOutputModel):
         E = load_matrix(files_basename + '.E') if os.path.isfile(files_basename + '.E') else None
 
         return cls.from_matrices(A, B, C, D, E, cont_time=cont_time,
+                                 T=None, time_stepper=None, num_values=None,
                                  state_id=state_id, solver_options=solver_options,
                                  error_estimator=error_estimator, visualizer=visualizer, name=name)
 
