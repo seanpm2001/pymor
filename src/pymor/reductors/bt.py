@@ -35,9 +35,15 @@ class GenericBTReductor(BasicObject):
         self.W = None
         self._pg_reductor = None
         self._sv_U_V_cache = None
+        self._gramians_cache = None
 
     def _gramians(self):
         """Return low-rank Cholesky factors of Gramians."""
+        if self._gramians_cache is None:
+            self._gramians_cache = self._gramians_computation()
+        return self._gramians_cache
+
+    def _gramians_computation(self):
         raise NotImplementedError
 
     def _sv_U_V(self):
@@ -131,7 +137,7 @@ class BTReductor(GenericBTReductor):
     mu
         |Parameter values|.
     """
-    def _gramians(self):
+    def _gramians_computation(self):
         return self.fom.gramian('c_lrcf', mu=self.mu), self.fom.gramian('o_lrcf', mu=self.mu)
 
     def error_bounds(self):
@@ -157,7 +163,7 @@ class LQGBTReductor(GenericBTReductor):
         super().__init__(fom, mu=mu)
         self.solver_options = solver_options
 
-    def _gramians(self):
+    def _gramians_computation(self):
         A, B, C, E = (getattr(self.fom, op).assemble(mu=self.mu)
                       for op in ['A', 'B', 'C', 'E'])
         if isinstance(E, IdentityOperator):
@@ -196,7 +202,7 @@ class BRBTReductor(GenericBTReductor):
         self.gamma = gamma
         self.solver_options = solver_options
 
-    def _gramians(self):
+    def _gramians_computation(self):
         A, B, C, E = (getattr(self.fom, op).assemble(mu=self.mu)
                       for op in ['A', 'B', 'C', 'E'])
         if isinstance(E, IdentityOperator):
