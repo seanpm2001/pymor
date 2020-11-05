@@ -3,12 +3,13 @@
 # License: BSD 2-Clause License (https://opensource.org/licenses/BSD-2-Clause)
 
 from hypothesis import strategies as hyst
-from hypothesis import assume, given
+from hypothesis import assume, given, event
 from hypothesis.extra import numpy as hynp
 import numpy as np
 from scipy.stats._multivariate import random_correlation_gen
 
 from pymor.core.config import config
+from pymor.vectorarrays.interface import VectorArray
 from pymor.vectorarrays.list import NumpyListVectorSpace
 from pymor.vectorarrays.block import BlockVectorSpace
 from pymor.vectorarrays.numpy import NumpyVectorSpace
@@ -161,6 +162,14 @@ def vector_arrays(draw, space_types, count=1, dtype=None, length=None, compatibl
     return ret
 
 
+def _args_to_event(first_arg):
+    while isinstance(first_arg, (tuple, list)):
+        first_arg = first_arg[0]
+    vec_type = type(first_arg)
+    assert isinstance(first_arg, VectorArray)
+    event(f'Parameterized with VectorArray type {vec_type}')
+
+
 def given_vector_arrays(which='all', count=1, dtype=None, length=None, compatible=True, index_strategy=None, **kwargs):
     """This decorator hides the combination details of given
 
@@ -195,18 +204,24 @@ def given_vector_arrays(which='all', count=1, dtype=None, length=None, compatibl
         except KeyError:
             use_imps = which
         first_args = {}
+        arg_cases = ('vectors_and_indices', 'vector_arrays', 'vector_array')
         if index_strategy:
-            arr_ind_strategy = index_strategy(vector_arrays(
+            strategy = index_strategy(vector_arrays(
                 count=count, dtype=dtype, length=length, compatible=compatible, space_types=use_imps))
-            first_args['vectors_and_indices'] = arr_ind_strategy
+            case = 0
         else:
-            arr_strategy = vector_arrays(count=count, dtype=dtype, length=length, compatible=compatible,
-                                         space_types=use_imps)
-            if count > 1:
-                first_args['vector_arrays'] = arr_strategy
-            else:
-                first_args['vector_array'] = arr_strategy
-        return given(**first_args, **kwargs)(func)
+            strategy = vector_arrays(count=count, dtype=dtype, length=length,
+                                     compatible=compatible, space_types=use_imps)
+            case = 1 if count > 1 else 2
+
+        first_args[arg_cases[case]] = strategy
+
+        def event_counted(*args, **kwargs):
+            assert len(args) == 0
+            _args_to_event(kwargs[arg_cases[case]])
+            return func(*args, **kwargs)
+
+        return given(**first_args, **kwargs)(event_counted)
 
     return inner_backend_decorator
 
@@ -376,7 +391,7 @@ def pairs_both_lengths(draw, array_strategy):
 
 @hyst.composite
 def base_vector_arrays(draw, count=1, dtype=None, max_dim=100):
-    """
+    """Basic hypothesis strategy to generate VectorArrays.
 
     Parameters
     ----------
