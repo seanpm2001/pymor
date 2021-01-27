@@ -29,7 +29,7 @@ API Documentation
     :maxdepth: 3
     :glob:
 
-    generated/pymor
+    autoapi/pymor
 
 Demo Applications
 *****************
@@ -38,4 +38,4 @@ Demo Applications
     :maxdepth: 3
     :glob:
 
-    generated/pymordemos
+    autoapi/pymordemos
