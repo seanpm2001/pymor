@@ -30,7 +30,6 @@ sys.path.insert(0, str(this_dir))
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.coverage',
               'sphinx.ext.autosummary',
-              'sphinx.ext.viewcode',
               'sphinx.ext.intersphinx',
               'pymordocstring',
               'try_on_binder',
