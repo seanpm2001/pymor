@@ -7,7 +7,6 @@ import slugify
 import glob
 import sphinx
 from pathlib import Path
-import astroid
 
 # Check Sphinx version
 if sphinx.__version__ < "1.7":
