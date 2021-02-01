@@ -17,7 +17,6 @@ provided for getting started quickly.
     getting_started
     technical_overview
     environment
-    tutorials
     release_notes/all.rst
     bibliography
     developer_docs
