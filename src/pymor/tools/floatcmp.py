@@ -88,7 +88,7 @@ def compare_with_tolerance(x, y, comparison_op, rtol=1e-14, atol=1e-14):
     """
     if comparison_op is operator.eq:
         warnings.warn('Use float_cmp for float equality tests')
-    return comparison_op(x-y, atol + y * rtol)
+    return comparison_op(x-y, atol + np.abs(y) * rtol)
 
 
 def almost_less(x, y, rtol=None, atol=None):
