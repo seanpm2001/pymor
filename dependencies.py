@@ -52,6 +52,7 @@ install_suggests = {
     'pythreejs': 'threejs bindings for python notebook  visualization',
     _PYTEST: 'testing framework required to execute unit tests',
     _PYSIDE: 'solution visualization for builtin discretizations',
+    'pytimings': 'coarse grained, automatic, code timing utilities',
     'ipywidgets': 'notebook GUI elements',
     'nbresuse': 'resource usage indicator for notebooks',
     'torch': 'PyTorch open source machine learning framework',
