@@ -1,7 +1,7 @@
 # This file is part of the pyMOR project (https://www.pymor.org).
 # Copyright 2013-2021 pyMOR developers and contributors. All rights reserved.
 # License: BSD 2-Clause License (https://opensource.org/licenses/BSD-2-Clause)
-
+import numba
 import numpy as np
 
 from pymor.discretizers.builtin.grids.interfaces import Grid
@@ -110,6 +110,7 @@ class UnstructuredTriangleGrid(Grid):
         return 'UnstructuredTriangleGrid with {} triangles, {} edges, {} vertices'.format(*self.sizes)
 
 
+@numba.jit(nopython=True)
 def compute_edges(subentities):
     X = np.empty_like(subentities, dtype=[('l', np.int32), ('h', np.int32)])
 

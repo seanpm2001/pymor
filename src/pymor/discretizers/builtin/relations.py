@@ -3,11 +3,11 @@
 # License: BSD 2-Clause License (https://opensource.org/licenses/BSD-2-Clause)
 
 import numpy as np
-
+import numba
 
 DTYPE = np.int32
 
-
+@numba.jit()
 def inverse_relation(SE, size_rhs=None, with_indices=False):
     S, I = np.unravel_index(np.arange(SE.size), SE.shape)
     SE = SE.ravel()

@@ -3,8 +3,10 @@
 # License: BSD 2-Clause License (https://opensource.org/licenses/BSD-2-Clause)
 
 import numpy as np
+import numba
 
 
+@numba.jit(nopython=True)
 def inv_two_by_two(A):
     """Efficiently compute the inverses of a |NumPy array| of 2x2-matrices
 
@@ -28,6 +30,7 @@ def inv_two_by_two(A):
     return INV
 
 
+@numba.jit(nopython=True)
 def inv_transposed_two_by_two(A):
     """Efficiently compute the tranposed inverses of a |Numpy array| of 2x2-matrices
 
