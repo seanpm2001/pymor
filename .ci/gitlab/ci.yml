@@ -91,7 +91,7 @@ stages:
             - api_failure
             - unknown_failure
             - job_execution_timeout
-
+    
     image: zivgitlab.wwu.io/pymor/docker/pymor/docker-in-docker:d1b5ebb4dc42a77cae82411da2e503a88bb8fb3a
     variables:
         DOCKER_HOST: tcp://docker:2375/
@@ -535,7 +535,7 @@ ci_weekly 3 7:
         - name: zivgitlab.wwu.io/pymor/docker/pymor/pypi-mirror_stable_py3.7:6921dfb5f30670a08f7eb0f21a92908f0c8f8458
           alias: pypi_mirror
     image: zivgitlab.wwu.io/pymor/docker/pymor/testing_py3.7:6921dfb5f30670a08f7eb0f21a92908f0c8f8458
-
+    
     script: ./.ci/gitlab/test_vanilla.bash
 ci_weekly 3 8:
     extends: .pytest
@@ -549,7 +549,7 @@ ci_weekly 3 8:
         - name: zivgitlab.wwu.io/pymor/docker/pymor/pypi-mirror_stable_py3.8:6921dfb5f30670a08f7eb0f21a92908f0c8f8458
           alias: pypi_mirror
     image: zivgitlab.wwu.io/pymor/docker/pymor/testing_py3.8:6921dfb5f30670a08f7eb0f21a92908f0c8f8458
-
+    
     script: ./.ci/gitlab/test_vanilla.bash
 ci_weekly 3 9:
     extends: .pytest
@@ -563,7 +563,7 @@ ci_weekly 3 9:
         - name: zivgitlab.wwu.io/pymor/docker/pymor/pypi-mirror_stable_py3.9:6921dfb5f30670a08f7eb0f21a92908f0c8f8458
           alias: pypi_mirror
     image: zivgitlab.wwu.io/pymor/docker/pymor/testing_py3.9:6921dfb5f30670a08f7eb0f21a92908f0c8f8458
-
+    
     script: ./.ci/gitlab/test_vanilla.bash
 
 submit coverage:
