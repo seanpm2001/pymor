@@ -12,6 +12,9 @@
 
 ### pyMOR 2022.1
 
+* Tim Keil, tim.keil@uni-muenster.de
+  * DWR output error estimation for elliptic problems
+
 * Hendrik Kleikamp, hendrik.kleikamp@uni-muenster.de
   * several additional features for neural networks
 
