@@ -3,6 +3,8 @@
 # License: BSD 2-Clause License (https://opensource.org/licenses/BSD-2-Clause)
 
 from math import ceil
+
+import matplotlib.cm
 import numpy as np
 import pyvista as pv
 from meshio._vtk_common import meshio_to_vtk_type
@@ -164,6 +166,26 @@ def visualize_vista_mesh(meshes, bounding_box=([0, 0], [1, 1]), codim=2, title=N
     return plotter.show()
 
 
+def matplotlib_to_vtk_colormap(cmap, vmin, vmax):
+    if isinstance(cmap, str):
+        cmap = matplotlib.cm.get_cmap(cmap)
+    no_colors = 256
+    lut = vtk.vtkLookupTable()
+    lut.SetNumberOfTableValues(no_colors)
+
+    x0 = vmin
+    x1 = vmax
+    lut.SetRange(x0, x1)
+
+    for i in range(no_colors):
+        step = i/no_colors
+        x = (1-step) * vmin + step * vmax
+        lut.SetTableValue(i, cmap(x))
+
+    lut.Build()
+    return lut
+
+
 class PyVistaPatchWidget(QVTKRenderWindowInteractor):
 
     def __init__(self, U, limits, parent, grid, bounding_box=([0, 0], [1, 1]), codim=2,
@@ -251,9 +273,8 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
             vdata.SetName(str(k))
             self.vtkgrid.GetCellData().AddArray(vdata)
 
-        n_colors = 256 * 4
-        self.lookupTable = self.mapper.GetLookupTable()
-        self.lookupTable.SetNumberOfTableValues(n_colors)
+        self._luts = [matplotlib_to_vtk_colormap('viridis', vmin[0], vmax[0]) for vmin, vmax in limits]
+
         # self.lookupTable.applyColorMap(GetPresetByName('viridis'))
         if False:  # interpolate_before_map:
             self.mapper.InterpolateScalarsBeforeMappingOn()
@@ -261,7 +282,6 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
         self.mapper.SetInputData(self.vtkgrid)
 
         self.step(0)
-
 
     def step(self, ind):
         ptdata = self.vtkgrid.GetPointData()
@@ -281,5 +301,7 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
             self.mapper.ScalarVisibilityOn()
             self.mapper.SetScalarModeToUsePointData()
             self.mapper.SetScalarRange(iarr.GetRange())
+        
+        self.mapper.SetLookupTable(self._luts[ind])
         self.GetRenderWindow().Render()
         
