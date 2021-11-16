@@ -5,8 +5,14 @@
 from math import ceil
 import numpy as np
 import pyvista as pv
-from pyvistaqt import QtInteractor
+from meshio._vtk_common import meshio_to_vtk_type
+from meshio.vtk._vtk import vtk_type_to_numnodes
+from pyvista.utilities.cells import numpy_to_idarr
+import vtk
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+from vtkmodules.util.numpy_support import numpy_to_vtk
+from vtkmodules.vtkCommonCore import vtkPoints
+from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData, vtkUnstructuredGrid
 
 from pymor.core.config import is_jupyter
 from pymor.discretizers.builtin.grids.io import to_meshio
@@ -166,24 +172,17 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
         assert grid.reference_element in (triangle, square)
         assert grid.dim == 2
         assert codim in (0, 2)
-        theme = _load_default_theme(interactive=(grid.dim == 3))
-        super().__init__(parent, theme=theme)
+        # theme = _load_default_theme(interactive=(grid.dim == 3))
+        super().__init__(parent)
         self.setMinimumSize(300, 300)
         self.setSizePolicy(QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding))
 
         self.scalar_name = 'Data'
-        self.mesh_kwargs = {'scalar_bar_args': _get_default_bar_args(),
-                            'scalars': self.scalar_name,
-                            'show_scalar_bar': show_scalar_bar}
+
         self.grid = grid
         self.reference_element = grid.reference_element
         self.codim = codim
-        self.set(U, limits)
-        # if grid.dim != 3:
-        #     # disable interactive camera
-        #     self.disable()
         widget = self
-        import vtk
 
         widget.Initialize()
         widget.Start()
@@ -192,15 +191,9 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
 
         self._renderer = vtk.vtkRenderer()
         widget.GetRenderWindow().AddRenderer(self._renderer)
-        from pyvista import from_meshio
-        vtkgrid = from_meshio(self.mesh_data[1])
 
+        # self.mapper = vtk.vtkPolyDataMapper()
         self.mapper = vtk.vtkDataSetMapper()
-        self.mapper.SetInputData(vtkgrid)
-        n_colors = 256*4
-        self.mapper.GetLookupTable().SetNumberOfTableValues(n_colors)
-        if False: #interpolate_before_map:
-            self.mapper.InterpolateScalarsBeforeMappingOn()
 
         actor = vtk.vtkActor()
         prop = vtk.vtkProperty()
@@ -209,15 +202,84 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
 
         self._renderer.AddActor(actor)
 
+        self.set(U, limits)
+        # if grid.dim != 3:
+        #     # disable interactive camera
+        #     self.disable()
+
     def set(self, U, limits):
         self.limits = limits
-        self.mesh_data = to_meshio(self.grid, data=U, scalar_name=self.scalar_name, codim=self.codim)
-        from pyvista import from_meshio
-        self.meshes = [from_meshio(mesh) for mesh in self.mesh_data]
-        self.mapper.SetLookupTable(self._luts[0])
+        self.meshio_mesh = to_meshio(self.grid, data=U, scalar_name=self.scalar_name, codim=self.codim)
+
+        cells = []
+        cell_type = []
+        for cell in self.meshio_mesh.cells:
+            vtktype = meshio_to_vtk_type[cell.type]
+            numnodes = vtk_type_to_numnodes[vtktype]
+            cells.append(
+                np.hstack((np.full((len(cell.data), 1), numnodes), cell.data)).ravel()
+            )
+            cell_type += [vtktype] * len(cell.data)
+        # this should overall be faster than adding each cell in the loop
+        cell_type = np.array(cell_type)
+        cells = np.concatenate(cells)
+        vtk_idarr, cells = numpy_to_idarr(cells, deep=False, return_ind=True)
+        vtkcells = vtkCellArray()
+        vtkcells.SetCells(cells.shape[0], vtk_idarr)
+
+        points = self.meshio_mesh.points
+        # pad 3rd dim with zeros
+        if points.shape[1] == 2:
+            points = np.hstack((points, np.zeros((len(points), 1))))
+        vtkpoints = vtkPoints()
+        vtkpoints.SetData(numpy_to_vtk(points))
+
+        self.vtkgrid = vtkUnstructuredGrid()
+        if cell_type.dtype != np.uint8:
+            cell_type = cell_type.astype(np.uint8)
+        vtkcelltype = numpy_to_vtk(cell_type)
+        self.vtkgrid.SetCells(vtkcelltype, vtkcells)
+        self.vtkgrid.SetPoints(vtkpoints)
+
+        for k in self.meshio_mesh.point_data.keys():
+            vdata = numpy_to_vtk(np.concatenate(self.meshio_mesh.point_data[k]))
+            vdata.SetName(str(k))
+            self.vtkgrid.GetPointData().AddArray(vdata)
+
+        for k in self.meshio_mesh.cell_data.keys():
+            vdata = numpy_to_vtk(np.concatenate(self.meshio_mesh.cell_data[k]))
+            vdata.SetName(str(k))
+            self.vtkgrid.GetCellData().AddArray(vdata)
+
+        n_colors = 256 * 4
+        self.lookupTable = self.mapper.GetLookupTable()
+        self.lookupTable.SetNumberOfTableValues(n_colors)
+        # self.lookupTable.applyColorMap(GetPresetByName('viridis'))
+        if False:  # interpolate_before_map:
+            self.mapper.InterpolateScalarsBeforeMappingOn()
+
+        self.mapper.SetInputData(self.vtkgrid)
+
+        self.step(0)
+
 
     def step(self, ind):
-        self.mapper.SetInputData(self.meshes[ind])
-        self.mapper.SetLookupTable(self._luts[ind])
+        ptdata = self.vtkgrid.GetPointData()
+        cldata = self.vtkgrid.GetCellData()
+
+        if self.codim == 0:
+            iarr = cldata.GetArray(ind)
+            icname = iarr.GetName()
+            err = cldata.SetActiveScalars(icname)
+            self.mapper.ScalarVisibilityOn()
+            self.mapper.SetScalarModeToUseCellData()
+            self.mapper.SetScalarRange(iarr.GetRange())
+        else:
+            iarr = ptdata.GetArray(ind)
+            ipname = iarr.GetName()
+            err = ptdata.SetActiveScalars(ipname)
+            self.mapper.ScalarVisibilityOn()
+            self.mapper.SetScalarModeToUsePointData()
+            self.mapper.SetScalarRange(iarr.GetRange())
         self.GetRenderWindow().Render()
         
