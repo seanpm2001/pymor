@@ -1,6 +1,7 @@
 # This file is part of the pyMOR project (https://www.pymor.org).
 # Copyright 2013-2021 pyMOR developers and contributors. All rights reserved.
 # License: BSD 2-Clause License (https://opensource.org/licenses/BSD-2-Clause)
+import math
 
 import numpy as np
 
@@ -56,10 +57,10 @@ def to_meshio(grid, codim, data=None, scalar_name='Data'):
             data = np.zeros((1, grid.size(2)))
     else:
         data = data.to_numpy() if codim == 0 else data.to_numpy()[:, entity_map].copy()
-    meshes = []
-    for i in range(len(data)):
-        if is_cell_data:
-            meshes.append(meshio.Mesh(coordinates, cells, cell_data={scalar_name: [data[i, :]]}))
-        else:
-            meshes.append(meshio.Mesh(coordinates, cells, point_data={scalar_name: data[i, :]}))
-    return meshes
+    scalar_count = len(data)
+    decimals = math.ceil(math.log10(scalar_count))
+    ddict = {f'{scalar_name}__{i:0{decimals}}': [data[i, :]] for i in range(scalar_count)}
+    if is_cell_data:
+        return meshio.Mesh(coordinates, cells, cell_data=ddict)
+    else:
+        return meshio.Mesh(coordinates, cells, point_data=ddict)
