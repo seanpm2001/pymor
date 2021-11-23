@@ -256,22 +256,29 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
         vtkpoints = vtkPoints()
         vtkpoints.SetData(numpy_to_vtk(points))
 
-        self.vtkgrid = vtkUnstructuredGrid()
+
         if cell_type.dtype != np.uint8:
             cell_type = cell_type.astype(np.uint8)
         vtkcelltype = numpy_to_vtk(cell_type)
-        self.vtkgrid.SetCells(vtkcelltype, vtkcells)
-        self.vtkgrid.SetPoints(vtkpoints)
 
-        for k in self.meshio_mesh.point_data.keys():
-            vdata = numpy_to_vtk(np.concatenate(self.meshio_mesh.point_data[k]))
-            vdata.SetName(str(k))
-            self.vtkgrid.GetPointData().AddArray(vdata)
+        if self.codim == 0:
+            keys = sorted(list(self.meshio_mesh.cell_data.keys()))
+            data_dir = self.meshio_mesh.cell_data
+        else:
+            keys = sorted(list(self.meshio_mesh.point_data.keys()))
+            data_dir = self.meshio_mesh.point_data
+        self._vtkgrids = [vtkUnstructuredGrid()] * len(keys)
+        for i, key in enumerate(keys):
+            vtkgrid = self._vtkgrids[i]
+            vtkgrid.SetCells(vtkcelltype, vtkcells)
+            vtkgrid.SetPoints(vtkpoints)
+            vdata = numpy_to_vtk(np.concatenate(data_dir[key]))
+            if self.codim == 0:
+                vtkgrid.GetCellData().AddArray(vdata)
+            else:
+                vtkgrid.GetPointData().AddArray(vdata)
+            vdata.SetName(key)
 
-        for k in self.meshio_mesh.cell_data.keys():
-            vdata = numpy_to_vtk(np.concatenate(self.meshio_mesh.cell_data[k]))
-            vdata.SetName(str(k))
-            self.vtkgrid.GetCellData().AddArray(vdata)
 
         self._luts = [matplotlib_to_vtk_colormap('viridis', vmin[0], vmax[0]) for vmin, vmax in limits]
 
@@ -279,29 +286,10 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
         if False:  # interpolate_before_map:
             self.mapper.InterpolateScalarsBeforeMappingOn()
 
-        self.mapper.SetInputData(self.vtkgrid)
 
         self.step(0)
 
     def step(self, ind):
-        ptdata = self.vtkgrid.GetPointData()
-        cldata = self.vtkgrid.GetCellData()
-
-        if self.codim == 0:
-            iarr = cldata.GetArray(ind)
-            icname = iarr.GetName()
-            err = cldata.SetActiveScalars(icname)
-            self.mapper.ScalarVisibilityOn()
-            self.mapper.SetScalarModeToUseCellData()
-            self.mapper.SetScalarRange(iarr.GetRange())
-        else:
-            iarr = ptdata.GetArray(ind)
-            ipname = iarr.GetName()
-            err = ptdata.SetActiveScalars(ipname)
-            self.mapper.ScalarVisibilityOn()
-            self.mapper.SetScalarModeToUsePointData()
-            self.mapper.SetScalarRange(iarr.GetRange())
-        
-        self.mapper.SetLookupTable(self._luts[ind])
+        self.mapper.SetInputData(self._vtkgrids[ind])
         self.GetRenderWindow().Render()
         
