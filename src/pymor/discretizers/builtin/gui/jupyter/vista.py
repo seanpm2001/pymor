@@ -9,6 +9,7 @@ import numpy as np
 import pyvista as pv
 from meshio._vtk_common import meshio_to_vtk_type
 from meshio.vtk._vtk import vtk_type_to_numnodes
+from pyvista import from_meshio
 from pyvista.utilities.cells import numpy_to_idarr
 import vtk
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
@@ -262,23 +263,31 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
         vtkcelltype = numpy_to_vtk(cell_type)
 
         if self.codim == 0:
-            keys = sorted(list(self.meshio_mesh.cell_data.keys()))
+            self._array_keys = sorted(list(self.meshio_mesh.cell_data.keys()))
             data_dir = self.meshio_mesh.cell_data
+            self.mapper.SetScalarModeToUseCellData()
         else:
-            keys = sorted(list(self.meshio_mesh.point_data.keys()))
+            self._array_keys = sorted(list(self.meshio_mesh.point_data.keys()))
             data_dir = self.meshio_mesh.point_data
-        self._vtkgrids = [vtkUnstructuredGrid()] * len(keys)
-        for i, key in enumerate(keys):
+            self.mapper.SetScalarModeToUsePointData()
+        self._vtkgrids = [vtkUnstructuredGrid()] * len(self._array_keys)
+
+        for i, key in enumerate(self._array_keys):
             vtkgrid = self._vtkgrids[i]
             vtkgrid.SetCells(vtkcelltype, vtkcells)
             vtkgrid.SetPoints(vtkpoints)
             vdata = numpy_to_vtk(np.concatenate(data_dir[key]))
+            vdata.SetName(key)
             if self.codim == 0:
                 vtkgrid.GetCellData().AddArray(vdata)
+                vtkgrid.GetCellData().SetActiveScalars(key)
             else:
                 vtkgrid.GetPointData().AddArray(vdata)
-            vdata.SetName(key)
+                vtkgrid.GetPointData().SetActiveScalars(key)
 
+        self.mapper.ScalarVisibilityOn()
+
+        # self.mapper.SetScalarRange(iarr.GetRange())
 
         self._luts = [matplotlib_to_vtk_colormap('viridis', vmin[0], vmax[0]) for vmin, vmax in limits]
 
@@ -290,6 +299,14 @@ class PyVistaPatchWidget(QVTKRenderWindowInteractor):
         self.step(0)
 
     def step(self, ind):
-        self.mapper.SetInputData(self._vtkgrids[ind])
+        vtkgrid = self._vtkgrids[ind]
+        key = self._array_keys[ind]
+        if self.codim == 0:
+            vtkgrid.GetCellData().SetActiveScalars(ind)
+        else:
+            vtkgrid.GetPointData().SetActiveScalars(ind)
+        self.mapper.SetInputData(vtkgrid)
+        # self.mapper.SetLookupTable(self._luts[ind])
         self.GetRenderWindow().Render()
+        from_meshio
         
