@@ -21,25 +21,22 @@ class DWRCoerciveRBReductor(BasicObject):
     functional with the DWR approach. (see :cite:`Haa17` (Definition 2.31)).
     This also enables a DWR based error estimator for the corrected output functional.
     The DWR approach requires a dual problem for every dimension of the output functional.
-    Each dual problem is defined by the dual operator and the corresponding component of
-    the output functional as right hand side. See also :meth:`~pymor.reductors.dwr.dual_model`.
+    Each dual problem needs to be predefined by the user and should have the respective
+    the output functional as right hand side. 
 
     Parameters
     ----------
     fom
         The |Model| which is to be reduced.
+    dual_foms
+        List of the dual |Models| (for each output dimension) which is used for
+        estimating the output functional.
     RB
         |VectorArray| containing the reduced basis on which to project.
     product
         See :class:`~pymor.reductors.coercive.CoerciveRBReductor`.
     coercivity_estimator
         See :class:`~pymor.reductors.coercive.CoerciveRBReductor`.
-    operator_is_symmetric
-        If the operator of `fom` is symmetric (in theory and before boundary treatment),
-        it can make sense to consider the same operator also for the adjoint case
-        for the dual models. In this case `operator_is_symmetric` as `True`,
-        means to use the same operator for both the primal as well as for the dual model.
-        If `False` the adjoint operator is used.
     dual_bases
         List of |VectorArrays| containing the reduced basis for the dual models that are
         constructed with :meth:`~pymor.reductors.dwr.dual_model`, where each entry
@@ -51,9 +48,8 @@ class DWRCoerciveRBReductor(BasicObject):
         See :class:`~pymor.reductors.basic.ProjectionBasedReductor`.
     """
 
-    def __init__(self, fom, primal_basis=None, product=None, coercivity_estimator=None,
-                 operator_is_symmetric=False, dual_bases=None, check_orthonormality=None,
-                 check_tol=None):
+    def __init__(self, fom, dual_foms, primal_basis=None, product=None, coercivity_estimator=None,
+                 dual_bases=None, check_orthonormality=None, check_tol=None):
         self.__auto_init(locals())
         self._last_rom = None
 
@@ -70,7 +66,7 @@ class DWRCoerciveRBReductor(BasicObject):
         # either needed for estimation or just for the corrected output
         for d in range(fom.dim_output):
             # construct dual model
-            dual_model = self.dual_model(fom, d, operator_is_symmetric)
+            dual_model = self.dual_foms[d]
             # choose dual basis
             if dual_bases is not None:
                 dual_basis = dual_bases[d]
@@ -138,40 +134,6 @@ class DWRCoerciveRBReductor(BasicObject):
         return CorrectedOutputFunctional(primal_rom.output_functional, dual_roms,
                                          dual_projected_primal_residuals)
 
-    @classmethod
-    def dual_model(cls, model, dim=0, operator_is_symmetric=False):
-        """Return dual model with the output as right hand side.
-
-        The dual equation is defined as to find the solution p such that
-
-            a(q, p) = - l_dim(q),       for all q,
-
-        where l_dim denotes the dim-th component of the output functional l.
-        See :cite:`Haa17` (Definition 2.26)
-
-        Parameters
-        ----------
-        model
-            The |Model| for which to construct the dual model
-        dim
-            The dimension of the `fom.output_functional` for which the dual model
-            is to be built.
-        operator_is_symmetric
-            If `True`, `fom.operator` is used for the dual operator of a(., .).
-            This is only feasable if the operator is symmetric (in theory).
-            If `False` the adjoint `fom.operator.H` is used instead.
-
-        Returns
-        -------
-        A |Model| with the adjoint operator and the corresponding right hand side
-        """
-        assert 0 <= dim < model.dim_output
-        e_i_vec = model.output_functional.range.from_numpy(np.eye(1, model.dim_output, dim))
-        dual_rhs = - model.output_functional.H @ VectorOperator(e_i_vec)
-        dual_operator = model.operator if operator_is_symmetric else model.operator.H
-        dual_model = model.with_(operator=dual_operator, rhs=dual_rhs,
-                                 output_functional=None, name=model.name + '_dual')
-        return dual_model
 
     def assemble_error_estimator_for_subbasis(self, dual_roms, dim):
         return self._last_rom.error_estimator.restricted_to_subbasis(dual_roms, dim, m=self._last_rom)

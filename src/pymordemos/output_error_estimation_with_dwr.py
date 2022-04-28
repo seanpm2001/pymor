@@ -58,33 +58,38 @@ def main(
                                              coercivity_estimator=coercivity_estimator)
 
     # also construct dual bases for dwr
-    # take the operator as the dual operator if it is symmetric
+    
+    # If the operator of `fom` is symmetric (in theory and before boundary treatment),
+    # it can make sense to consider the same operator also for the adjoint case
+    # for the dual models. In this case `operator_symmetric` as `True`,
+    # means to use the same operator for both the primal as well as for the dual model.
+    # If `False` the adjoint operator is used.
     symmetries = [True, False]
     dwr_reductors = []
     for operator_symmetric in symmetries:
+        dual_foms = []
         dual_reduced_bases = []
         for d in range(fom.dim_output):
             dual_snapshots = fom.solution_space.empty()
-            # initialize dual model from reductor
-            dual_fom = dwr_reductor.dual_model(fom, d, operator_symmetric)
+            # construct dual model
+            dual_fom = create_dual_model(fom, d, operator_symmetric)
+            dual_foms.append(dual_fom)
             for mu in training_set:
                 dual_snapshots.append(dual_fom.solve(mu))
             dual_reduced_bases.append(pod(dual_snapshots, modes=modes, product=product)[0])
 
-        dwr_RB_reductor = dwr_reductor(fom,
+        dwr_RB_reductor = dwr_reductor(fom, dual_foms,
                                        primal_basis=primal_reduced_basis,
                                        product=product,
                                        dual_bases=dual_reduced_bases,
-                                       coercivity_estimator=coercivity_estimator,
-                                       operator_is_symmetric=operator_symmetric)
+                                       coercivity_estimator=coercivity_estimator)
         dwr_reductors.append(dwr_RB_reductor)
 
     # dwr reductor without dual basis
-    dwr_reductor_primal = dwr_reductor(fom,
+    dwr_reductor_primal = dwr_reductor(fom, dual_foms,
                                        primal_basis=primal_reduced_basis,
                                        product=product,
-                                       coercivity_estimator=coercivity_estimator,
-                                       operator_is_symmetric=operator_symmetric)
+                                       coercivity_estimator=coercivity_estimator)
     dwr_reductors.append(dwr_reductor_primal)
 
     # rom
@@ -187,6 +192,39 @@ def create_fom(grid_intervals, vector_valued_output=False):
     fom, _ = discretize_stationary_cg(p, diameter=1./grid_intervals)
     return fom
 
+def create_dual_model(fom, dim=0, operator_is_symmetric=False):
+    """Return dual model with the output as right hand side.
+
+    The dual equation is defined as to find the solution p such that
+
+        a(q, p) = - l_dim(q),       for all q,
+
+    where l_dim denotes the dim-th component of the output functional l.
+    See :cite:`Haa17` (Definition 2.26)
+
+    Parameters
+    ----------
+    model
+        The |Model| for which to construct the dual model
+    dim
+        The dimension of the `fom.output_functional` for which the dual model
+        is to be built.
+    operator_is_symmetric
+        If `True`, `fom.operator` is used for the dual operator of a(., .).
+        This is only feasable if the operator is symmetric (in theory).
+        If `False` the adjoint `fom.operator.H` is used instead.
+
+    Returns
+    -------
+    A |Model| with the adjoint operator and the corresponding right hand side
+    """
+    assert 0 <= dim < fom.dim_output
+    e_i_vec = fom.output_functional.range.from_numpy(np.eye(1, fom.dim_output, dim))
+    dual_rhs = - fom.output_functional.H @ VectorOperator(e_i_vec)
+    dual_operator = fom.operator if operator_is_symmetric else fom.operator.H
+    dual_model = fom.with_(operator=dual_operator, rhs=dual_rhs,
+                           output_functional=None, name=fom.name + '_dual')
+    return dual_model
 
 if __name__ == '__main__':
     run(main)
