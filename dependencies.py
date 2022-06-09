@@ -16,12 +16,13 @@ def _numpy_scipy():
     # numpy versions with filters according to minimal version with a wheel
     numpys = [
         'numpy>=1.17.5;python_version == "3.8"',
-        'numpy>=1.19.4;python_version >= "3.9"',
+        'numpy>=1.19.4;python_version == "3.9"',
+        'numpy>=1.21.5;python_version >= "3.10"',
     ]
     scipys = [
-        'scipy>=1.3;python_version < "3.8"',
         'scipy>=1.3.3;python_version == "3.8"',
-        'scipy>=1.5.4;python_version >= "3.9"',
+        'scipy>=1.5.4;python_version == "3.9"',
+        'scipy>=1.7.3;python_version >= "3.10"',
     ]
     return numpys + scipys
 
